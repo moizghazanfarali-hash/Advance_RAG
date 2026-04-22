@@ -3,3 +3,4 @@ pymongo
 groq
 requests
 python-dotenv
+fastapi
