@@ -1,0 +1,5 @@
+streamlit
+pymongo
+groq
+requests
+python-dotenv
