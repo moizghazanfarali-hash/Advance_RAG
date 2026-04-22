@@ -4,11 +4,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # Vercel ke liye relative imports (sath dot '.' lagana lazmi hai)
-from parser import extract_content
-from vector_data import add_to_mongodb 
-from llm_service import generate_answer
-from hybrid_search_engine import perform_hybrid_search
-
+from .parser import extract_content
+from .vector_data import add_to_mongodb 
+from .llm_service import generate_answer
+from .hybrid_search_engine import perform_hybrid_search
 app = FastAPI(title="Tesla AI RAG System v5")
 
 # CORS Add karein taake Streamlit is se baat kar sakay
