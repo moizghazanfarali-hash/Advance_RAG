@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
+import os
 
-API_BASE = "http://localhost:8000"
+# ── API Configuration ──────────────────────────────────────────────────────────
+API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 st.set_page_config(
     page_title="DocMind AI",
@@ -22,11 +24,9 @@ html, body, .stApp {
     font-family: 'DM Sans', sans-serif !important;
 }
 
-/* Hide streamlit default elements */
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding: 2rem 2.5rem 2rem 2.5rem !important; max-width: 100% !important; }
 
-/* ── Sidebar ── */
 [data-testid="stSidebar"] {
     background: #13151d !important;
     border-right: 1px solid #1e2130 !important;
@@ -73,7 +73,6 @@ html, body, .stApp {
     margin-top: 1.5rem;
 }
 
-/* Upload area */
 [data-testid="stFileUploader"] {
     background: #1a1d27 !important;
     border: 1px dashed #2a2d3e !important;
@@ -87,7 +86,6 @@ html, body, .stApp {
 [data-testid="stFileUploader"] label { display: none !important; }
 [data-testid="stFileUploader"] small { color: #4a5068 !important; font-size: 11px !important; }
 
-/* Upload button */
 [data-testid="stFileUploader"] button {
     background: transparent !important;
     border: 1px solid #2a2d3e !important;
@@ -103,17 +101,6 @@ html, body, .stApp {
     color: #00e5a0 !important;
 }
 
-.upload-placeholder {
-    text-align: center;
-    padding: 20px 12px;
-    color: #4a5068;
-    font-size: 12px;
-    line-height: 1.6;
-}
-.upload-placeholder .up-icon { font-size: 22px; margin-bottom: 8px; }
-.upload-placeholder .up-title { color: #8b8fa8; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
-
-/* File badge */
 .file-badge {
     display: flex;
     align-items: center;
@@ -135,7 +122,6 @@ html, body, .stApp {
     font-size: 12px;
 }
 
-/* Status dot */
 .status-row {
     display: flex;
     align-items: center;
@@ -149,7 +135,6 @@ html, body, .stApp {
 .dot-green { width: 6px; height: 6px; border-radius: 50%; background: #00e5a0; box-shadow: 0 0 6px #00e5a0; flex-shrink: 0; }
 .dot-red   { width: 6px; height: 6px; border-radius: 50%; background: #ff4d6a; flex-shrink: 0; }
 
-/* ── Main area ── */
 .page-header {
     margin-bottom: 1.8rem;
     padding-bottom: 1.2rem;
@@ -167,7 +152,6 @@ html, body, .stApp {
     color: #4a5068;
 }
 
-/* Empty state */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -180,9 +164,6 @@ html, body, .stApp {
 .empty-icon { font-size: 36px; margin-bottom: 16px; opacity: 0.6; }
 .empty-title { font-size: 15px; font-weight: 500; color: #6b6f85; margin-bottom: 6px; }
 .empty-sub { font-size: 13px; line-height: 1.6; max-width: 320px; }
-
-/* Messages */
-.msg-wrap { margin-bottom: 6px; }
 
 .user-msg {
     display: flex;
@@ -242,7 +223,6 @@ html, body, .stApp {
     letter-spacing: 0.3px;
 }
 
-/* Input row */
 .input-wrap {
     position: sticky;
     bottom: 0;
@@ -268,7 +248,6 @@ html, body, .stApp {
 }
 .stTextInput > div > div > input::placeholder { color: #4a5068 !important; }
 
-/* Send button */
 .stButton > button {
     background: linear-gradient(135deg, #00e5a0, #00b87a) !important;
     color: #0a0f0a !important;
@@ -286,7 +265,6 @@ html, body, .stApp {
 }
 .stButton > button:active { transform: translateY(0) !important; }
 
-/* Clear button */
 .clear-btn button {
     background: transparent !important;
     border: 1px solid #1e2130 !important;
@@ -302,24 +280,20 @@ html, body, .stApp {
     transform: none !important;
 }
 
-/* Spinner */
 .stSpinner > div { border-top-color: #00e5a0 !important; }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2d3e; border-radius: 4px; }
 
-/* Divider */
 hr { border-color: #1e2130 !important; margin: 1rem 0 !important; }
 
-/* Success / error / info */
 .stSuccess { background: rgba(0,229,160,0.08) !important; border: 1px solid rgba(0,229,160,0.2) !important; color: #00e5a0 !important; border-radius: 8px !important; }
 .stError   { background: rgba(255,77,106,0.08) !important; border: 1px solid rgba(255,77,106,0.2) !important; color: #ff4d6a !important; border-radius: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session state ──────────────────────────────────────────────────────────────
+# ── Session State ──────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "uploaded_file_name" not in st.session_state:
@@ -349,17 +323,24 @@ with st.sidebar:
         if st.button("Process Document →", use_container_width=True):
             with st.spinner("Processing..."):
                 try:
+                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
                     resp = requests.post(
                         f"{API_BASE}/upload",
-                        files={"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+                        files=files,
+                        timeout=60
                     )
                     if resp.status_code == 200:
                         st.session_state.uploaded_file_name = uploaded_file.name
-                        st.success("Ready to chat!")
+                        st.success("✅ Document processed! Ready to chat.")
                     else:
-                        st.error(f"Failed: {resp.json().get('detail', 'Unknown error')}")
+                        error_msg = resp.json().get('detail', 'Unknown error')
+                        st.error(f"Failed to process: {error_msg}")
                 except requests.exceptions.ConnectionError:
-                    st.error("Backend not running.")
+                    st.error(f"❌ Cannot connect to backend.\n\nBackend URL: `{API_BASE}`\n\nMake sure the server is running!")
+                except requests.exceptions.Timeout:
+                    st.error("⏱️ Request timeout. The file might be too large.")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
     if st.session_state.uploaded_file_name:
         st.markdown(f"""
@@ -369,45 +350,51 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # Status
+    # Backend Status
     try:
-        r = requests.get(f"{API_BASE}/health", timeout=1)
+        r = requests.get(f"{API_BASE}/health", timeout=2)
         connected = r.status_code == 200
-    except:
+        status_msg = "Backend connected"
+    except requests.exceptions.ConnectionError:
         connected = False
+        status_msg = "Backend offline"
+    except Exception as e:
+        connected = False
+        status_msg = "Backend error"
 
-    dot = "dot-green" if connected else "dot-red"
-    label = "Backend connected" if connected else "Backend offline"
+    dot_class = "dot-green" if connected else "dot-red"
     st.markdown(f"""
     <div class="status-row">
-        <div class="{dot}"></div>
-        <span>{label}</span>
+        <div class="{dot_class}"></div>
+        <span>{status_msg}</span>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("")
-    with st.container():
-        st.markdown('<div class="clear-btn">', unsafe_allow_html=True)
-        if st.button("Clear conversation", use_container_width=True):
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🗑️ Clear", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        if st.button("⟳ Refresh", use_container_width=True):
+            st.rerun()
 
-# ── Main ────────────────────────────────────────────────────────────────────────
+# ── Main Content ──────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="page-header">
-    <div class="page-title">Document Chat</div>
-    <div class="page-sub">Ask anything about your uploaded document</div>
+    <div class="page-title">💬 Document Chat</div>
+    <div class="page-sub">Ask anything about your uploaded PDF</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Chat history
+# Chat History
 if not st.session_state.messages:
     st.markdown("""
     <div class="empty-state">
         <div class="empty-icon">◈</div>
         <div class="empty-title">No conversation yet</div>
-        <div class="empty-sub">Upload a PDF from the sidebar, then ask any question about its content.</div>
+        <div class="empty-sub">Upload a PDF from the sidebar and ask questions about its content.</div>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -423,6 +410,7 @@ else:
             if msg.get("sources"):
                 chips = "".join([f'<span class="source-chip">📄 {s}</span>' for s in msg["sources"]])
                 sources_html = f'<div class="sources-row">{chips}</div>'
+            
             answer = msg["content"].replace("\n", "<br>")
             st.markdown(f"""
             <div class="bot-msg">
@@ -431,9 +419,10 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-# Input
+# Input Section
 st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
 col1, col2 = st.columns([6, 1])
+
 with col1:
     user_input = st.text_input(
         "Question",
@@ -441,36 +430,58 @@ with col1:
         label_visibility="collapsed",
         key="user_input"
     )
+
 with col2:
     send = st.button("Send", use_container_width=True)
+
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Handle send
+# Handle Send
 if send and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input.strip()})
-    with st.spinner(""):
+    
+    with st.spinner("Searching for answer..."):
         try:
             resp = requests.get(
                 f"{API_BASE}/ask/",
-                params={"question": user_input.strip()}
+                params={"question": user_input.strip()},
+                timeout=30
             )
+            
             if resp.status_code == 200:
                 data = resp.json()
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": data.get("answer", "No answer found."),
+                    "content": data.get("answer", "No answer found in the document."),
                     "sources": data.get("sources", [])
                 })
             else:
+                error_detail = resp.json().get('detail', 'Unknown error')
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": f"Error: {resp.json().get('detail', 'Something went wrong.')}",
+                    "content": f"❌ Error: {error_detail}",
                     "sources": []
                 })
+        
+        except requests.exceptions.Timeout:
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": "⏱️ Request timeout. Please try again.",
+                "sources": []
+            })
+        
         except requests.exceptions.ConnectionError:
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": "Cannot connect to backend. Make sure `uvicorn main:app --reload` is running.",
+                "content": f"❌ Cannot connect to backend at `{API_BASE}`\n\nMake sure the FastAPI server is running!",
                 "sources": []
             })
+        
+        except Exception as e:
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"❌ Error: {str(e)}",
+                "sources": []
+            })
+    
     st.rerun()
