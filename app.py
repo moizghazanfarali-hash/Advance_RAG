@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
 import os
+from datetime import datetime
 
-# ── API Configuration ──────────────────────────────────────────────────────────
+# ── Configuration ──────────────────────────────────────────────────────────────
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 st.set_page_config(
@@ -12,6 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ── Custom CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -78,7 +80,6 @@ html, body, .stApp {
     border: 1px dashed #2a2d3e !important;
     border-radius: 10px !important;
     padding: 8px !important;
-    transition: border-color 0.2s !important;
 }
 [data-testid="stFileUploader"]:hover {
     border-color: #00e5a0 !important;
@@ -94,7 +95,6 @@ html, body, .stApp {
     font-size: 12px !important;
     font-family: 'DM Sans', sans-serif !important;
     padding: 6px 14px !important;
-    transition: all 0.2s !important;
 }
 [data-testid="stFileUploader"] button:hover {
     border-color: #00e5a0 !important;
@@ -179,6 +179,7 @@ html, body, .stApp {
     font-size: 14px;
     color: #c8d4f0;
     line-height: 1.6;
+    word-wrap: break-word;
 }
 
 .bot-msg {
@@ -205,6 +206,7 @@ html, body, .stApp {
     font-size: 14px;
     color: #c8cad6;
     line-height: 1.7;
+    word-wrap: break-word;
 }
 .sources-row {
     margin-top: 10px;
@@ -240,7 +242,6 @@ html, body, .stApp {
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
     padding: 12px 16px !important;
-    transition: border-color 0.2s !important;
 }
 .stTextInput > div > div > input:focus {
     border-color: #00e5a0 !important;
@@ -257,13 +258,11 @@ html, body, .stApp {
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
     height: 46px !important;
-    transition: opacity 0.2s, transform 0.15s !important;
 }
 .stButton > button:hover {
     opacity: 0.88 !important;
     transform: translateY(-1px) !important;
 }
-.stButton > button:active { transform: translateY(0) !important; }
 
 .clear-btn button {
     background: transparent !important;
@@ -276,8 +275,6 @@ html, body, .stApp {
 .clear-btn button:hover {
     border-color: #ff4d6a !important;
     color: #ff4d6a !important;
-    opacity: 1 !important;
-    transform: none !important;
 }
 
 .stSpinner > div { border-top-color: #00e5a0 !important; }
@@ -290,6 +287,7 @@ hr { border-color: #1e2130 !important; margin: 1rem 0 !important; }
 
 .stSuccess { background: rgba(0,229,160,0.08) !important; border: 1px solid rgba(0,229,160,0.2) !important; color: #00e5a0 !important; border-radius: 8px !important; }
 .stError   { background: rgba(255,77,106,0.08) !important; border: 1px solid rgba(255,77,106,0.2) !important; color: #ff4d6a !important; border-radius: 8px !important; }
+.stWarning { background: rgba(255,160,0,0.08) !important; border: 1px solid rgba(255,160,0,0.2) !important; color: #ffa000 !important; border-radius: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -298,6 +296,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "uploaded_file_name" not in st.session_state:
     st.session_state.uploaded_file_name = None
+if "doc_loaded" not in st.session_state:
+    st.session_state.doc_loaded = False
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -311,7 +311,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-label">Upload Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">📄 Upload Document</div>', unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader(
         "Upload PDF",
@@ -321,28 +321,32 @@ with st.sidebar:
 
     if uploaded_file:
         if st.button("Process Document →", use_container_width=True):
-            with st.spinner("Processing..."):
+            with st.spinner("Processing PDF..."):
                 try:
                     files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
                     resp = requests.post(
-                        f"{API_BASE}/upload",
+                        f"{API_BASE}/ingest/",
                         files=files,
-                        timeout=60
+                        timeout=120
                     )
+                    
                     if resp.status_code == 200:
+                        data = resp.json()
                         st.session_state.uploaded_file_name = uploaded_file.name
-                        st.success("✅ Document processed! Ready to chat.")
+                        st.session_state.doc_loaded = True
+                        st.success(f"✅ {data.get('message', 'Document processed!')}")
                     else:
                         error_msg = resp.json().get('detail', 'Unknown error')
-                        st.error(f"Failed to process: {error_msg}")
-                except requests.exceptions.ConnectionError:
-                    st.error(f"❌ Cannot connect to backend.\n\nBackend URL: `{API_BASE}`\n\nMake sure the server is running!")
+                        st.error(f"❌ Failed: {error_msg}")
+                        
                 except requests.exceptions.Timeout:
-                    st.error("⏱️ Request timeout. The file might be too large.")
+                    st.error("⏱️ Request timeout. File might be too large.")
+                except requests.exceptions.ConnectionError:
+                    st.error(f"❌ Cannot connect to backend.\n\n**URL:** `{API_BASE}`\n\nMake sure FastAPI is running!")
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                    st.error(f"❌ Error: {str(e)}")
 
-    if st.session_state.uploaded_file_name:
+    if st.session_state.doc_loaded and st.session_state.uploaded_file_name:
         st.markdown(f"""
         <div class="file-badge">
             <span>📄</span>
@@ -352,17 +356,15 @@ with st.sidebar:
 
     # Backend Status
     try:
-        r = requests.get(f"{API_BASE}/health", timeout=2)
-        connected = r.status_code == 200
-        status_msg = "Backend connected"
-    except requests.exceptions.ConnectionError:
+        r = requests.get(f"{API_BASE}/docs", timeout=2)
+        connected = True
+        status_msg = "✅ Backend connected"
+        dot_class = "dot-green"
+    except:
         connected = False
-        status_msg = "Backend offline"
-    except Exception as e:
-        connected = False
-        status_msg = "Backend error"
+        status_msg = "❌ Backend offline"
+        dot_class = "dot-red"
 
-    dot_class = "dot-green" if connected else "dot-red"
     st.markdown(f"""
     <div class="status-row">
         <div class="{dot_class}"></div>
@@ -375,16 +377,22 @@ with st.sidebar:
     with col1:
         if st.button("🗑️ Clear", use_container_width=True):
             st.session_state.messages = []
+            st.session_state.doc_loaded = False
+            st.session_state.uploaded_file_name = None
             st.rerun()
     with col2:
         if st.button("⟳ Refresh", use_container_width=True):
             st.rerun()
 
+    st.markdown("---")
+    st.caption(f"🔗 Backend: `{API_BASE}`")
+    st.caption("💡 Upload a PDF, then ask questions about it.")
+
 # ── Main Content ──────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="page-header">
     <div class="page-title">💬 Document Chat</div>
-    <div class="page-sub">Ask anything about your uploaded PDF</div>
+    <div class="page-sub">Ask anything about your uploaded documents</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -394,7 +402,7 @@ if not st.session_state.messages:
     <div class="empty-state">
         <div class="empty-icon">◈</div>
         <div class="empty-title">No conversation yet</div>
-        <div class="empty-sub">Upload a PDF from the sidebar and ask questions about its content.</div>
+        <div class="empty-sub">Upload a PDF from the sidebar, then ask questions about its content.</div>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -408,7 +416,8 @@ else:
         else:
             sources_html = ""
             if msg.get("sources"):
-                chips = "".join([f'<span class="source-chip">📄 {s}</span>' for s in msg["sources"]])
+                unique_sources = list(set(msg["sources"]))
+                chips = "".join([f'<span class="source-chip">📄 {s}</span>' for s in unique_sources])
                 sources_html = f'<div class="sources-row">{chips}</div>'
             
             answer = msg["content"].replace("\n", "<br>")
@@ -438,50 +447,53 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 # Handle Send
 if send and user_input.strip():
-    st.session_state.messages.append({"role": "user", "content": user_input.strip()})
-    
-    with st.spinner("Searching for answer..."):
-        try:
-            resp = requests.get(
-                f"{API_BASE}/ask/",
-                params={"question": user_input.strip()},
-                timeout=30
-            )
+    if not st.session_state.doc_loaded:
+        st.warning("⚠️ Please upload and process a document first.")
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_input.strip()})
+        
+        with st.spinner("Searching for answer..."):
+            try:
+                resp = requests.get(
+                    f"{API_BASE}/ask/",
+                    params={"question": user_input.strip()},
+                    timeout=30
+                )
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": data.get("answer", "No answer found in documents."),
+                        "sources": data.get("sources", [])
+                    })
+                else:
+                    error_detail = resp.json().get('detail', 'Unknown error')
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": f"❌ Error: {error_detail}",
+                        "sources": []
+                    })
             
-            if resp.status_code == 200:
-                data = resp.json()
+            except requests.exceptions.Timeout:
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": data.get("answer", "No answer found in the document."),
-                    "sources": data.get("sources", [])
+                    "content": "⏱️ Request timeout. Please try again.",
+                    "sources": []
                 })
-            else:
-                error_detail = resp.json().get('detail', 'Unknown error')
+            
+            except requests.exceptions.ConnectionError:
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": f"❌ Error: {error_detail}",
+                    "content": f"❌ Cannot connect to backend.\n\n**URL:** `{API_BASE}`\n\nMake sure FastAPI server is running: `uvicorn main:app --reload`",
+                    "sources": []
+                })
+            
+            except Exception as e:
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"❌ Error: {str(e)}",
                     "sources": []
                 })
         
-        except requests.exceptions.Timeout:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": "⏱️ Request timeout. Please try again.",
-                "sources": []
-            })
-        
-        except requests.exceptions.ConnectionError:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"❌ Cannot connect to backend at `{API_BASE}`\n\nMake sure the FastAPI server is running!",
-                "sources": []
-            })
-        
-        except Exception as e:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"❌ Error: {str(e)}",
-                "sources": []
-            })
-    
-    st.rerun()
+        st.rerun()
