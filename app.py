@@ -84,11 +84,11 @@ with st.sidebar:
     st.caption("Powered by Jina + Groq + MongoDB")
     st.divider()
 
-    st.markdown("📦 **Data already loaded in cloud**")
-    st.caption("Aap seedha sawal pooch sakte hain.")
+    st.markdown("📦 **Data is already loaded in the cloud**")
+    st.caption("You can start asking questions right away.")
     st.divider()
 
-    if st.button("🗑️ Chat Clear Karein", use_container_width=True):
+    if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
@@ -97,22 +97,25 @@ with st.sidebar:
 
 # ─── Main: Chat ───────────────────────────────────────────────────────────────
 st.markdown('<p class="chat-header">💬 RAG Chat</p>', unsafe_allow_html=True)
-st.caption("Cloud mein stored documents se seedha jawab milega.")
+st.caption("Get instant answers from documents stored in the cloud.")
 st.divider()
 
-# Chat history
+# ─── Chat History ─────────────────────────────────────────────────────────────
 with st.container():
     if not st.session_state.messages:
         st.markdown(
             "<div style='text-align:center; color:#6b7280; padding: 60px 0; font-size:14px;'>"
-            "💬 Koi bhi sawal poochein — data cloud mein already available hai."
+            "💬 Ask any question — your data is already available in the cloud."
             "</div>",
             unsafe_allow_html=True
         )
     else:
         for msg in st.session_state.messages:
             if msg["role"] == "user":
-                st.markdown(f'<div class="user-msg">🧑 {msg["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="user-msg">🧑 {msg["content"]}</div>',
+                    unsafe_allow_html=True
+                )
             else:
                 answer_html = msg["content"].replace("\n", "<br>")
                 sources_html = ""
@@ -127,23 +130,23 @@ with st.container():
 
 st.divider()
 
-# ─── Input ─────────────────────────────────────────────────────────────────────
+# ─── Input ────────────────────────────────────────────────────────────────────
 col1, col2 = st.columns([5, 1])
 with col1:
     user_input = st.text_input(
-        "Sawal poochein...",
-        placeholder="Maslan: What is the main topic of the document?",
+        "Ask a question...",
+        placeholder="e.g. What is the main topic of the document?",
         label_visibility="collapsed",
         key="user_input"
     )
 with col2:
     send = st.button("Send 🚀", use_container_width=True)
 
-# ─── Handle Send ───────────────────────────────────────────────────────────────
+# ─── Handle Send ──────────────────────────────────────────────────────────────
 if send and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input.strip()})
 
-    with st.spinner("Jawab dhoondh raha hoon..."):
+    with st.spinner("Searching for an answer..."):
         try:
             resp = requests.get(
                 f"{API_BASE}/ask/",
@@ -153,19 +156,19 @@ if send and user_input.strip():
                 data = resp.json()
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": data.get("answer", "Jawab nahi mila."),
+                    "content": data.get("answer", "No answer found in the documents."),
                     "sources": data.get("sources", [])
                 })
             else:
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": f"❌ Error: {resp.json().get('detail', 'Unknown error')}",
+                    "content": f"❌ Error: {resp.json().get('detail', 'Unknown error occurred.')}",
                     "sources": []
                 })
         except requests.exceptions.ConnectionError:
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": "❌ Backend se connect nahi ho saka. Kripya `uvicorn main:app --reload` run karein.",
+                "content": "❌ Unable to connect to the backend. Please make sure `uvicorn main:app --reload` is running.",
                 "sources": []
             })
 
